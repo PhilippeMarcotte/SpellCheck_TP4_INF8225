@@ -1,0 +1,6 @@
+Learning Phrase Representations using RNN Encoder–Decoder
+for Statistical Machine Translation
+https://arxiv.org/pdf/1406.1078.pdf
+
+Sequence-to-Sequence Models
+https://www.tensorflow.org/tutorials/seq2seq
