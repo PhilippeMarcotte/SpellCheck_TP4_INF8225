@@ -1,1 +1,4 @@
 *-monolingual*
+dataset/*
+.vscode/*
+tags
