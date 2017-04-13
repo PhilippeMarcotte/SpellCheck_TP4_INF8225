@@ -1,11 +1,13 @@
 import numpy as np
 import re
 import os
+import collections
 from os import listdir
 
 DEFAULT_DATASET_PATH = './dataset/training-monolingual.tokenized.shuffled'
 CLEANED_DATASET_PATH = DEFAULT_DATASET_PATH + '.cleaned'
 MAX_DATASET_SIZE = 1000000000
+NUMBER_OF_LINES = 306068
 
 NORMALIZE_WHITESPACE_REGEX = re.compile(r'[^\S\n]+', re.UNICODE) # match all whitespace except newlines
 RE_DASH_FILTER = re.compile(r'[\-\˗\֊\‐\‑\‒\–\—\⁻\₋\−\﹣\－]', re.UNICODE)
@@ -64,7 +66,7 @@ def cleanup_dataset():
             clean_data.write(cleaned_line + "\n")
         
 
-def parse_dataset(dataset_size = 300000):
+def parse_dataset(training_proportion=0.7, heldout_proportion=0.15):
     char_vocab = Vocabulary()
     char_vocab.feed(' ')
 
@@ -74,29 +76,44 @@ def parse_dataset(dataset_size = 300000):
 
     file_names = listdir(CLEANED_DATASET_PATH)
 
-    i_file = 0
+    sets = [("train",round(NUMBER_OF_LINES*training_proportion)),("valid",round(NUMBER_OF_LINES*heldout_proportion)),("test",round(NUMBER_OF_LINES*heldout_proportion))]
 
-    word_tokens = []
-    char_tokens = []
+    word_tokens = collections.defaultdict(list)
+    char_tokens = collections.defaultdict(list)
 
-    while len(word_tokens) < dataset_size and i_file < len(file_names):
+    with open(CLEANED_DATASET_PATH + '/' + file_names[0], mode="r", encoding="utf-8") as file:
+            for set_label, set_size in sets:
+                for i in range(set_size):
+                    for word in file.readline().split():
+                        word_tokens[set_label].append(word_vocab.feed(word))
 
-        file = open(CLEANED_DATASET_PATH + '/' + file_names[i_file], mode="r", encoding="utf-8")
-        i_file += 1
+                        char_array = [char_vocab.feed(c) for c in word]
+                        char_tokens[set_label].append(char_array)
 
-        for line in file:
-            line = line.strip()
+                        max_word_length = max(max_word_length, len(char_array))
 
-            for word in line.split():
-                word_tokens.append(word_vocab.feed(word))
+    # on peut supprimer ces prints si tu veux                      
+    print()
+    print('actual longest token length is:', actual_max_word_length)
+    print('size of word vocabulary:', word_vocab.size)
+    print('size of char vocabulary:', char_vocab.size)
+    print('number of tokens in train:', len(word_tokens['train']))
+    print('number of tokens in valid:', len(word_tokens['valid']))
+    print('number of tokens in test:', len(word_tokens['test']))
 
-                char_array = [char_vocab.feed(c) for c in word]
-                char_tokens.append(char_array)
+    # now we know the sizes, create tensors
+    word_tensors = {}
+    char_tensors = {}
+    for fname in ('train', 'valid', 'test'):
+        assert len(char_tokens[fname]) == len(word_tokens[fname])
 
-                max_word_length = max(max_word_length, len(char_array))
+        word_tensors[fname] = np.array(word_tokens[fname], dtype=np.int32)
+        char_tensors[fname] = np.zeros([len(char_tokens[fname]), actual_max_word_length], dtype=np.int32)
 
-        file.close()
-        print(char_vocab.tokenByIndex_)
+        for i, char_array in enumerate(char_tokens[fname]):
+            char_tensors[fname] [i,:len(char_array)] = char_array
+
+    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length
 
 def load_dataset(dataset_size = 300000):
 
