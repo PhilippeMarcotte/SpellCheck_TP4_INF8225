@@ -94,7 +94,7 @@ def parse_dataset(training_proportion=0.7, heldout_proportion=0.15):
 
     # on peut supprimer ces prints si tu veux                      
     print()
-    print('actual longest token length is:', actual_max_word_length)
+    print('actual longest token length is:', max_word_length)
     print('size of word vocabulary:', word_vocab.size)
     print('size of char vocabulary:', char_vocab.size)
     print('number of tokens in train:', len(word_tokens['train']))
@@ -108,12 +108,12 @@ def parse_dataset(training_proportion=0.7, heldout_proportion=0.15):
         assert len(char_tokens[fname]) == len(word_tokens[fname])
 
         word_tensors[fname] = np.array(word_tokens[fname], dtype=np.int32)
-        char_tensors[fname] = np.zeros([len(char_tokens[fname]), actual_max_word_length], dtype=np.int32)
+        char_tensors[fname] = np.zeros([len(char_tokens[fname]), max_word_length], dtype=np.int32)
 
         for i, char_array in enumerate(char_tokens[fname]):
             char_tensors[fname] [i,:len(char_array)] = char_array
 
-    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length
+    return word_vocab, char_vocab, word_tensors, char_tensors, max_word_length
 
 def load_dataset(dataset_size = 300000):
 
