@@ -23,8 +23,10 @@ class DataReader:
         word_tensor = word_tensor[:reduced_length]
         char_tensor = char_tensor[:reduced_length, :]
 
-        self.amount_of_noise = 0.2 / max_word_length
         ydata = word_tensor.copy()
+
+        self.amount_of_noise = 0.2 / max_word_length
+        self.max_word_length = max_word_length
 
         corrupted_char_tensor = self.corrupt(char_tensor)
 
@@ -53,19 +55,20 @@ class DataReader:
     
     def delete_random_characeter(self, word):
         random_char_position = self.random_position(word)
-        word = word[:random_char_position] + word[random_char_position + 1:]
+        word = np.delete(word, random_char_position)
         return word
 
     def add_random_character(self, word):
         random_char_position = self.random_position(word)
-        random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
-        word = word[:random_char_position] + random_char_replacement + word[random_char_position:]
+        random_char = self.random_position(self.char_vocab.tokenByIndex_)
+        word = np.insert(word, random_char_position, random_char)
         return word
     
     def transpose_random_characters(self, word):
+
         random_char_position = self.random_position(word)
-        word = (word[:random_char_position] + word[random_char_position+1] + word[random_char_position] +
-                    word[random_char_position + 2:])
+        if random_char_position + 1 < len(word):
+            word[random_char_position + 1], word[random_char_position] = word[random_char_position], word[random_char_position + 1]
         return word
 
     def corrupt(self, words):
@@ -74,16 +77,15 @@ class DataReader:
 
             if np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.replace_random_character(word)
-            """
+                
             if np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.delete_random_characeter(word)
 
-            if len(word) < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
+            if len(word) + 1 < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.add_random_character(word)
-            
+
             if np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.transpose_random_characters(word)
-            """
                 
         return corrupted_words
 
