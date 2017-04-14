@@ -22,19 +22,19 @@ class DataReader:
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
         self.word_tensor = word_tensor[:reduced_length]
         self.char_tensor = char_tensor[:reduced_length, :]
-        self.amount_of_noise = 0.2/self.max_word_length
-        ydata = word_tensor.copy()
+        self.amount_of_noise = 0.2 / self.max_word_length
+        self.ydata = self.word_tensor.copy()
 
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
     
     def random_position(self, tensor):
-       return tf.random_uniform(shape=(1,), minval=0, maxval=len(tensor), dtype=tf.int32)
+       return np.random.randint(low=0, high=len(tensor))
 
     def replace_random_character(self, word):
         random_char_position = self.random_position(word)
         random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
-        word[random_char_position] = tf.gather(self.char_vocab.tokenByIndex_,random_char_replacement)
+        word[random_char_position] = random_char_replacement
         return word
     
     def delete_random_characeter(self, word):
@@ -44,8 +44,8 @@ class DataReader:
 
     def add_random_character(self, word):
         random_char_position = self.random_position(word)
-        random_char = tf.gather(self.char_vocab,random_position(self.char_vocab.tokenByIndex_))
-        word = word[:random_char_position] + random_char + word[random_char_position:]
+        random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
+        word = word[:random_char_position] + random_char_replacement + word[random_char_position:]
         return word
     
     def transpose_random_characters(self, word):
@@ -57,20 +57,26 @@ class DataReader:
     def corrupt(self, words):
         corrupted_words = words.copy()
         for word in corrupted_words:
-            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.replace_random_character(word), word)
 
-            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.delete_random_characeter(word), word)
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.replace_random_character(word)
+            """
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.delete_random_characeter(word)
 
-            word = tf.cond(len(word) < self.max_word_length and tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.add_random_character(word), word)
+            if len(word) < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.add_random_character(word)
             
-            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.transpose_random_characters(word), word)
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.transpose_random_characters(word)
+            """
                 
         return corrupted_words
 
     def iter(self):
-        corrupted_char_tensor = self.corrupt(self.char_tensor)
-        x_batches = self.corrupted_char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
-        y_batches = self.ydata.reshape([batch_size, -1, num_unroll_steps])
+        self.corrupted_char_tensor = self.corrupt(self.char_tensor)
+        x_batches = self.corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
+        y_batches = self.ydata.reshape([self.batch_size, -1, self.num_unroll_steps])
 
         x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
         y_batches = np.transpose(y_batches, axes=(1, 0, 2))
