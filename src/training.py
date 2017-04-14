@@ -3,6 +3,8 @@ import numpy as np
 import os
 from Preprocessing import load_dataset
 
+import model
+
 TRAINING_DIR = "./training"
 
 class DataReader:
@@ -21,10 +23,6 @@ class DataReader:
 
         ydata = word_tensor.copy()
 
-        self._x_batches = list(x_batches)
-        self._y_batches = list(y_batches)
-        assert len(self._x_batches) == len(self._y_batches)
-        self.length = len(self._y_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
     
@@ -63,12 +61,19 @@ class DataReader:
 
         x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
         y_batches = np.transpose(y_batches, axes=(1, 0, 2))
+
+        self._x_batches = list(x_batches)
+        self._y_batches = list(y_batches)
+
+        assert len(self._x_batches) == len(self._y_batches)
+        self.length = len(self._y_batches)
+
         for x, y in zip(x_batches, y_batches):
             yield x, y
 
-def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels=[1,2,3,4,5,6,7], kernel_features=[50,100,150,200,200,200,200],
-         max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
-         param_init=0.05, max_epochs=25, print_every=5):
+def train(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels=[1,2,3,4,5,6,7], kernel_features=[50,100,150,200,200,200,200],
+          max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
+          param_init=0.05, max_epochs=25, print_every=5):
 
     ''' Trains model from data '''
 
@@ -238,6 +243,9 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
                 print('new learning rate is:', current_learning_rate)
             else:
                 best_valid_loss = avg_valid_loss
+
+def main(_):
+    train()
 
 if __name__ == "__main__":
     tf.app.run()
