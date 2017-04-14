@@ -7,7 +7,9 @@ from os import listdir
 DEFAULT_DATASET_PATH = './dataset/training-monolingual.tokenized.shuffled'
 CLEANED_DATASET_PATH = DEFAULT_DATASET_PATH + '.cleaned'
 MAX_DATASET_SIZE = 1000000000
-NUMBER_OF_LINES = 306068
+#NUMBER_OF_LINES = 306068
+# TODO: Utiliser comme paramètre d'entrer dans la fonction.
+NUMBER_OF_LINES = 30000
 
 NORMALIZE_WHITESPACE_REGEX = re.compile(r'[^\S\n]+', re.UNICODE) # match all whitespace except newlines
 RE_DASH_FILTER = re.compile(r'[\-\˗\֊\‐\‑\‒\–\—\⁻\₋\−\﹣\－]', re.UNICODE)

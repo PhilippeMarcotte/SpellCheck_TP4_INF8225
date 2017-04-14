@@ -16,16 +16,30 @@ class DataReader:
         length = word_tensor.shape[0]
         assert char_tensor.shape[0] == length
 
-        self.max_word_length = char_tensor.shape[1]
+        max_word_length = char_tensor.shape[1]
 
         # round down length to whole number of slices
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
-        self.word_tensor = word_tensor[:reduced_length]
-        self.char_tensor = char_tensor[:reduced_length, :]
-        self.amount_of_noise = 0.2 / self.max_word_length
-        self.ydata = self.word_tensor.copy()
+        word_tensor = word_tensor[:reduced_length]
+        char_tensor = char_tensor[:reduced_length, :]
 
-        self.batch_size = batch_size
+        self.amount_of_noise = 0.2 / max_word_length
+        ydata = word_tensor.copy()
+
+        corrupted_char_tensor = self.corrupt(char_tensor)
+
+        x_batches = corrupted_char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
+        y_batches = ydata.reshape([batch_size, -1, num_unroll_steps])
+
+        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
+        y_batches = np.transpose(y_batches, axes=(1, 0, 2))
+
+        self._x_batches = list(x_batches)
+        self._y_batches = list(y_batches)
+        assert len(self._x_batches) == len(self._y_batches)
+
+        self.length = len(self._y_batches)
+        self.batch_size =  batch_size
         self.num_unroll_steps = num_unroll_steps
     
     def random_position(self, tensor):
@@ -74,20 +88,8 @@ class DataReader:
         return corrupted_words
 
     def iter(self):
-        self.corrupted_char_tensor = self.corrupt(self.char_tensor)
-        x_batches = self.corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
-        y_batches = self.ydata.reshape([self.batch_size, -1, self.num_unroll_steps])
 
-        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
-        y_batches = np.transpose(y_batches, axes=(1, 0, 2))
-
-        self._x_batches = list(x_batches)
-        self._y_batches = list(y_batches)
-
-        assert len(self._x_batches) == len(self._y_batches)
-        self.length = len(self._y_batches)
-
-        for x, y in zip(x_batches, y_batches):
+        for x, y in zip(self._x_batches, self._y_batches):
             yield x, y
 
 def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
