@@ -121,7 +121,7 @@ def load_dataset(dataset_size = 300000):
 
     download_dataset()
     cleanup_dataset() 
-    parse_dataset()
+    return parse_dataset()
 
 if __name__ == "__main__":
     load_dataset()

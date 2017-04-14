@@ -63,11 +63,13 @@ class DataReader:
 
         x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
         y_batches = np.transpose(y_batches, axes=(1, 0, 2))
-        for x, y in zip(self._x_batches, self._y_batches):
+        for x, y in zip(x_batches, y_batches):
             yield x, y
 
 def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels=[1,2,3,4,5,6,7], kernel_features=[50,100,150,200,200,200,200],
-         max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0):
+         max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
+         param_init=0.05, max_epochs=25, print_every=5):
+
     ''' Trains model from data '''
 
     if not os.path.exists(TRAINING_DIR):
@@ -91,11 +93,11 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
     with tf.Graph().as_default(), tf.Session() as session:
 
         # tensorflow seed must be inside graph
-        tf.set_random_seed(FLAGS.seed)
-        np.random.seed(seed=FLAGS.seed)
+        tf.set_random_seed(seed)
+        np.random.seed(seed=seed)
 
         ''' build training graph '''
-        initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
+        initializer = tf.random_uniform_initializer(param_init, param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
                     char_vocab_size=char_vocab.size,
@@ -151,7 +153,7 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
         ''' training starts here '''
         best_valid_loss = None
         rnn_state = session.run(train_model.initial_rnn_state)
-        for epoch in range(FLAGS.max_epochs):
+        for epoch in range(max_epochs):
             epoch_start_time = time.time()
             avg_train_loss = 0.0
             count = 0
@@ -176,7 +178,7 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
 
                 time_elapsed = time.time() - start_time
 
-                if count % FLAGS.print_every == 0:
+                if count % print_every == 0:
                     print('%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (step,
                                                             epoch, count,
                                                             train_reader.length,
@@ -203,7 +205,7 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
                     valid_model.initial_rnn_state: rnn_state,
                 })
 
-                if count % FLAGS.print_every == 0:
+                if count % print_every == 0:
                     print("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
                 avg_valid_loss += loss / valid_reader.length
 
