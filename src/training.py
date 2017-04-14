@@ -256,8 +256,5 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
             else:
                 best_valid_loss = avg_valid_loss
 
-def main(_):
-    train()
-
 if __name__ == "__main__":
     tf.app.run()
