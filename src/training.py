@@ -1,6 +1,8 @@
 import tensorflow as tf
 import numpy as np
 import os
+import model
+import time
 from Preprocessing import load_dataset
 
 TRAINING_DIR = "./training"
@@ -18,47 +20,54 @@ class DataReader:
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
         self.word_tensor = word_tensor[:reduced_length]
         self.char_tensor = char_tensor[:reduced_length, :]
-
+        self.amount_of_noise = 0.2/self.max_word_length
         ydata = word_tensor.copy()
 
-        self._x_batches = list(x_batches)
-        self._y_batches = list(y_batches)
-        assert len(self._x_batches) == len(self._y_batches)
-        self.length = len(self._y_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
     
-    def random_position(tensor):
-       return tf.random_uniform(minval=0, maxval=len(tensor), dtype=dtypes.int32)
+    def random_position(self, tensor):
+       return tf.random_uniform(shape=(1,), minval=0, maxval=len(tensor), dtype=tf.int32)
 
-    def corrupt(words):
+    def replace_random_character(self, word):
+        random_char_position = self.random_position(word)
+        random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
+        word[random_char_position] = tf.gather(self.char_vocab.tokenByIndex_,random_char_replacement)
+        return word
+    
+    def delete_random_characeter(self, word):
+        random_char_position = self.random_position(word)
+        word = word[:random_char_position] + word[random_char_position + 1:]
+        return word
+
+    def add_random_character(self, word):
+        random_char_position = self.random_position(word)
+        random_char = tf.gather(self.char_vocab,random_position(self.char_vocab.tokenByIndex_))
+        word = word[:random_char_position] + random_char + word[random_char_position:]
+        return word
+    
+    def transpose_random_characters(self, word):
+        random_char_position = self.random_position(word)
+        word = (word[:random_char_position] + word[random_char_position+1] + word[random_char_position] +
+                    word[random_char_position + 2:])
+        return word
+
+    def corrupt(self, words):
         corrupted_words = words.copy()
         for word in corrupted_words:
-            """Add some artificial spelling mistakes to the string"""
-            if tf.random_uniform() < amount_of_noise * len(word):
-                # Replace a character with a random character
-                random_char_position = random_position(word)
-                random_char_replacement = random_position(self.char_vocab)
-                word[random_char_position] = self.char_vocab[random_char_replacement]
-            if tf.random_uniform() < amount_of_noise * len(a_string):
-                # Delete a character
-                random_char_position = random_position(word)
-                word = word[:random_char_position] + word[random_char_position + 1:]
-            if len(word) < self.max_word_length and tf.random_uniform() < amount_of_noise * len(word):
-                # Add a random character
-                random_char_position = random_position(word)
-                random_char = self.char_vocab[random_position(self.char_vocab)]
-                word = word[:random_char_position] + random_char + word[random_char_position:]
-            if tf.random_uniform() < amount_of_noise * len(word):
-                # Transpose 2 characters
-                random_char_position = random_position(word)
-                word = (word[:random_char_position] + word[random_char_position+1] + word[random_char_position] +
-                            word[random_char_position + 2:])
+            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.replace_random_character(word), word)
+
+            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.delete_random_characeter(word), word)
+
+            word = tf.cond(len(word) < self.max_word_length and tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.add_random_character(word), word)
+            
+            word = tf.cond(tf.random_uniform(shape=(1,)) < self.amount_of_noise * len(word), self.transpose_random_characters(word), word)
+                
         return corrupted_words
 
     def iter(self):
-        corrupted_char_tensor = corrupt(self.char_tensor)
-        x_batches = self.char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
+        corrupted_char_tensor = self.corrupt(self.char_tensor)
+        x_batches = self.corrupted_char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
         y_batches = self.ydata.reshape([batch_size, -1, num_unroll_steps])
 
         x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
@@ -66,7 +75,7 @@ class DataReader:
         for x, y in zip(x_batches, y_batches):
             yield x, y
 
-def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels=[1,2,3,4,5,6,7], kernel_features=[50,100,150,200,200,200,200],
+def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
          max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
          param_init=0.05, max_epochs=25, print_every=5):
 
@@ -100,8 +109,8 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
         initializer = tf.random_uniform_initializer(param_init, param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
+                    char_vocab_size=char_vocab.size(),
+                    word_vocab_size=word_vocab.size(),
                     char_embed_size=char_embed_size,
                     batch_size=batch_size,
                     rnn_size=rnn_size,
@@ -124,8 +133,8 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
+                    char_vocab_size=char_vocab.size(),
+                    word_vocab_size=word_vocab.size(),
                     char_embed_size=char_embed_size,
                     batch_size=batch_size,
                     rnn_size=rnn_size,
@@ -135,13 +144,13 @@ def main(batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, k
                     num_unroll_steps=num_unroll_steps)
             valid_model.update(model.loss_graph(valid_model.logits, batch_size, num_unroll_steps))
 
-        if load_model:
+        '''if load_model:
             saver.restore(session, load_model)
             print('Loaded model from', load_model, 'saved at global step', train_model.global_step.eval())
-        else:
-            tf.global_variables_initializer().run()
-            session.run(train_model.clear_char_embedding_padding)
-            print('Created and initialized fresh model. Size:', model.model_size())
+        else:'''
+        tf.global_variables_initializer().run()
+        session.run(train_model.clear_char_embedding_padding)
+        print('Created and initialized fresh model. Size:', model.model_size())
 
         summary_writer = tf.summary.FileWriter(TRAINING_DIR, graph=session.graph)
 
