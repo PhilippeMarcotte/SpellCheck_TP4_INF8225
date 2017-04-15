@@ -11,7 +11,7 @@ flags = tf.flags
 # data
 flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
 flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('models',   "./training/",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('load_model',   "./training/epoch024_7.4892.model",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
 flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
@@ -36,13 +36,15 @@ FLAGS = flags.FLAGS
 def main(_):
     ''' Loads trained model and evaluates it on test split '''
 
-    if FLAGS.models is None:
+    if FLAGS.load_model is None:
         print('Please specify checkpoint file to load model from')
         return -1
 
-    if not os.path.exists(FLAGS.models):
+    '''
+    if not os.path.exists(FLAGS.load_model):
         print('Checkpoint file not found', FLAGS.load_model)
         return -1
+    '''
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_dataset()
@@ -75,8 +77,8 @@ def main(_):
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
         saver = tf.train.Saver()
-        saver.restore(session, tf.train.latest_checkpoint(FLAGS.models))
-        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.models), 'saved at global step', global_step.eval())
+        saver.restore(session, FLAGS.load_model)
+        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.load_model), 'saved at global step', global_step.eval())
 
         ''' test starts here '''
         rnn_state = session.run(m.initial_rnn_state)
