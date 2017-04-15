@@ -20,27 +20,12 @@ class DataReader:
 
         # round down length to whole number of slices
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
-        word_tensor = word_tensor[:reduced_length]
-        char_tensor = char_tensor[:reduced_length, :]
+        self.word_tensor = word_tensor[:reduced_length]
+        self.char_tensor = char_tensor[:reduced_length, :]
 
-        ydata = word_tensor.copy()
 
         self.amount_of_noise = 0.2 / max_word_length
         self.max_word_length = max_word_length
-
-        corrupted_char_tensor = self.corrupt(char_tensor)
-
-        x_batches = corrupted_char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
-        y_batches = ydata.reshape([batch_size, -1, num_unroll_steps])
-
-        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
-        y_batches = np.transpose(y_batches, axes=(1, 0, 2))
-
-        self._x_batches = list(x_batches)
-        self._y_batches = list(y_batches)
-        assert len(self._x_batches) == len(self._y_batches)
-
-        self.length = len(self._y_batches)
         self.batch_size =  batch_size
         self.num_unroll_steps = num_unroll_steps
     
@@ -72,6 +57,7 @@ class DataReader:
         return word
 
     def corrupt(self, words):
+        print(np.random.uniform())
         corrupted_words = words.copy()
         for word in corrupted_words:
 
@@ -91,7 +77,18 @@ class DataReader:
 
     def iter(self):
 
-        for x, y in zip(self._x_batches, self._y_batches):
+        ydata = self.word_tensor.copy()
+        corrupted_char_tensor = self.corrupt(self.char_tensor)
+
+        x_batches = corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
+        y_batches = ydata.reshape([self.batch_size, -1, self.num_unroll_steps])
+
+        x_batches = list(np.transpose(x_batches, axes=(1, 0, 2, 3)))
+        y_batches = list(np.transpose(y_batches, axes=(1, 0, 2)))
+
+        assert len(x_batches) == len(y_batches)
+
+        for x, y in zip(x_batches, y_batches):
             yield x, y
 
 def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
