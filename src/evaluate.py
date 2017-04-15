@@ -40,11 +40,9 @@ def main(_):
         print('Please specify checkpoint file to load model from')
         return -1
 
-    '''
-    if not os.path.exists(FLAGS.load_model):
+    if not os.path.exists(FLAGS.load_model + '.meta'):
         print('Checkpoint file not found', FLAGS.load_model)
         return -1
-    '''
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_dataset()
