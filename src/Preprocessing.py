@@ -9,7 +9,7 @@ CLEANED_DATASET_PATH = DEFAULT_DATASET_PATH + '.cleaned'
 MAX_DATASET_SIZE = 1000000000
 #NUMBER_OF_LINES = 306068
 # TODO: Utiliser comme paramètre d'entrer dans la fonction.
-NUMBER_OF_LINES = 300000
+NUMBER_OF_LINES = 30000
 
 NORMALIZE_WHITESPACE_REGEX = re.compile(r'[^\S\n]+', re.UNICODE) # match all whitespace except newlines
 RE_DASH_FILTER = re.compile(r'[\-\˗\֊\‐\‑\‒\–\—\⁻\₋\−\﹣\－]', re.UNICODE)
@@ -124,7 +124,7 @@ def load_dataset(dataset_size = 300000):
     download_dataset()
     cleanup_dataset() 
     return parse_dataset()
-
+'''
 class DataReader:
     def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, char_vocab):
         self.char_vocab = char_vocab
@@ -207,6 +207,89 @@ class DataReader:
     def iter(self):
 
         for x, y in zip(self._x_batches, self._y_batches):
+            yield x, y
+'''
+
+class DataReader:
+
+    def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, char_vocab):
+        self.char_vocab = char_vocab
+        length = word_tensor.shape[0]
+        assert char_tensor.shape[0] == length
+
+        max_word_length = char_tensor.shape[1]
+
+        # round down length to whole number of slices
+        reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
+        self.word_tensor = word_tensor[:reduced_length]
+        self.char_tensor = char_tensor[:reduced_length, :]
+
+
+        self.amount_of_noise = 0.2 / max_word_length
+        self.max_word_length = max_word_length
+        self.batch_size =  batch_size
+        self.num_unroll_steps = num_unroll_steps
+    
+    def random_position(self, tensor):
+       return np.random.randint(low=0, high=len(tensor))
+
+    def replace_random_character(self, word):
+        random_char_position = self.random_position(word)
+        random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
+        word[random_char_position] = random_char_replacement
+        return word
+    
+    def delete_random_characeter(self, word):
+        random_char_position = self.random_position(word)
+        word = np.delete(word, random_char_position)
+        return word
+
+    def add_random_character(self, word):
+        random_char_position = self.random_position(word)
+        random_char = self.random_position(self.char_vocab.tokenByIndex_)
+        word = np.insert(word, random_char_position, random_char)
+        return word
+    
+    def transpose_random_characters(self, word):
+
+        random_char_position = self.random_position(word)
+        if random_char_position + 1 < len(word):
+            word[random_char_position + 1], word[random_char_position] = word[random_char_position], word[random_char_position + 1]
+        return word
+
+    def corrupt(self, words):
+        print(np.random.uniform())
+        corrupted_words = words.copy()
+        for word in corrupted_words:
+
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.replace_random_character(word)
+                
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.delete_random_characeter(word)
+
+            if len(word) + 1 < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.add_random_character(word)
+
+            if np.random.uniform() < self.amount_of_noise * len(word):
+                word = self.transpose_random_characters(word)
+                
+        return corrupted_words
+
+    def iter(self):
+
+        ydata = self.word_tensor.copy()
+        corrupted_char_tensor = self.corrupt(self.char_tensor)
+
+        x_batches = corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
+        y_batches = ydata.reshape([self.batch_size, -1, self.num_unroll_steps])
+
+        x_batches = list(np.transpose(x_batches, axes=(1, 0, 2, 3)))
+        y_batches = list(np.transpose(y_batches, axes=(1, 0, 2)))
+
+        assert len(x_batches) == len(y_batches)
+
+        for x, y in zip(x_batches, y_batches):
             yield x, y
 
 if __name__ == "__main__":
