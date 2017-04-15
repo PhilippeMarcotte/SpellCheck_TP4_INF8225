@@ -1,22 +1,17 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import time
 import numpy as np
 import tensorflow as tf
 
 import model
-from data_reader import load_data, DataReader
-
+from Preprocessing import load_dataset, DataReader
 
 flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
 flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('models',   "./training/",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
 flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
@@ -38,43 +33,22 @@ flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single u
 
 FLAGS = flags.FLAGS
 
-
-def run_test(session, m, data, batch_size, num_steps):
-    """Runs the model on the given data."""
-
-    costs = 0.0
-    iters = 0
-    state = session.run(m.initial_state)
-
-    for step, (x, y) in enumerate(reader.dataset_iterator(data, batch_size, num_steps)):
-        cost, state = session.run([m.cost, m.final_state], {
-            m.input_data: x,
-            m.targets: y,
-            m.initial_state: state
-        })
-
-        costs += cost
-        iters += 1
-
-    return costs / iters
-
-
-def main(_, load_model=""):
+def main(_):
     ''' Loads trained model and evaluates it on test split '''
 
-    if FLAGS.load_model is None:
+    if FLAGS.models is None:
         print('Please specify checkpoint file to load model from')
         return -1
 
-    if not os.path.exists(FLAGS.load_model):
+    if not os.path.exists(FLAGS.models):
         print('Checkpoint file not found', FLAGS.load_model)
         return -1
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
-        load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
+        load_dataset()
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
 
     print('initialized test dataset reader')
 
@@ -87,27 +61,24 @@ def main(_, load_model=""):
         ''' build inference graph '''
         with tf.variable_scope("Model"):
             m = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
+                    char_vocab_size=char_vocab.size(),
+                    word_vocab_size=word_vocab.size(),
                     char_embed_size=FLAGS.char_embed_size,
                     batch_size=FLAGS.batch_size,
-                    num_highway_layers=FLAGS.highway_layers,
-                    num_rnn_layers=FLAGS.rnn_layers,
                     rnn_size=FLAGS.rnn_size,
                     max_word_length=max_word_length,
                     kernels=eval(FLAGS.kernels),
                     kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=0)
+                    num_unroll_steps=FLAGS.num_unroll_steps)
             m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
         saver = tf.train.Saver()
-        saver.restore(session, FLAGS.load_model)
-        print('Loaded model from', FLAGS.load_model, 'saved at global step', global_step.eval())
+        saver.restore(session, tf.train.latest_checkpoint(FLAGS.models))
+        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.models), 'saved at global step', global_step.eval())
 
-        ''' training starts here '''
+        ''' test starts here '''
         rnn_state = session.run(m.initial_rnn_state)
         count = 0
         avg_loss = 0

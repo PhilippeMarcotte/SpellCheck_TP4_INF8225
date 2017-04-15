@@ -9,6 +9,25 @@ import model
 
 TRAINING_DIR = "./training"
 
+def run_test(session, m, data, batch_size, num_steps):
+    """Runs the model on the given data."""
+
+    costs = 0.0
+    iters = 0
+    state = session.run(m.initial_state)
+
+    for step, (x, y) in enumerate(reader.dataset_iterator(data, batch_size, num_steps)):
+        cost, state = session.run([m.cost, m.final_state], {
+            m.input_data: x,
+            m.targets: y,
+            m.initial_state: state
+        })
+
+        costs += cost
+        iters += 1
+
+    return costs / iters
+
 class DataReader:
 
     def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, char_vocab):
