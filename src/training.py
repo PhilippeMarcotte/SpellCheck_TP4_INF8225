@@ -5,11 +5,13 @@ import os
 import model
 import time
 import csv
-from Preprocessing import load_dataset, DataReader
+from data_reader import load_data, DataReader
 
 import model
 
 TRAINING_DIR = "./training/{}/"
+DATA_DIR = "./data"
+MAX_WORD_LENGTH = 65
 
 def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
          max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
@@ -22,13 +24,13 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         print('Created training directory', directory)
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
-        load_dataset()
+        load_data(DATA_DIR, 65)
 
     char_embedding_metadata = os.path.join(directory + "characters_embeddings.tsv")
     with open(char_embedding_metadata, "w", encoding="utf-8") as metadata_file:
         metadata_file.write('padding\n')
-        for i in range(1, char_vocab.size()):
-            metadata_file.write('%s\n' % (char_vocab.tokenByIndex_[i]))
+        for i in range(1, char_vocab.size):
+            metadata_file.write('%s\n' % (char_vocab.token(i)))
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               batch_size, num_unroll_steps, char_vocab)
@@ -54,8 +56,8 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         initializer = tf.random_uniform_initializer(param_init, param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size(),
-                    word_vocab_size=word_vocab.size(),
+                    char_vocab_size=char_vocab.size,
+                    word_vocab_size=word_vocab.size,
                     char_embed_size=char_embed_size,
                     batch_size=batch_size,
                     rnn_size=rnn_size,
@@ -80,8 +82,8 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size(),
-                    word_vocab_size=word_vocab.size(),
+                    char_vocab_size=char_vocab.size,
+                    word_vocab_size=word_vocab.size,
                     char_embed_size=char_embed_size,
                     batch_size=batch_size,
                     rnn_size=rnn_size,
@@ -97,7 +99,7 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         else:'''
         tf.global_variables_initializer().run()
         session.run(train_model.clear_char_embedding_padding)
-        print('Created and initialized fresh model. Size:', model.model_size())
+        print('Created and initialized fresh model. Size:', model.model_size)
 
         summary_writer = tf.summary.FileWriter(directory, graph=session.graph)
 

@@ -14,9 +14,10 @@ from data_reader import load_data, DataReader
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model',   None,    'filename of the model to load')
+#flags.DEFINE_string('load_model',   ,    'filename of the model to load')
+flags.DEFINE_string('load_model',   "./training/cv/epoch024_4.4068.model",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 # we need data only to compute vocabulary
-flags.DEFINE_string('data_dir',   'data',    'data directory')
+flags.DEFINE_string('data_dir',   './mkroutikov/data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
 flags.DEFINE_float('temperature', 1.0, 'sampling temperature')
 
@@ -88,6 +89,37 @@ def main(_):
         rnn_state = session.run(m.initial_rnn_state)
         logits = np.ones((word_vocab.size,))
         rnn_state = session.run(m.initial_rnn_state)
+
+        while True:
+
+            word = input('Enter a word : ').lower()
+            if (len(word) > max_word_length):
+                print('Invalid word, maximum word size is ' + max_word_length)
+                continue
+
+            char_input = np.zeros((1, 1, max_word_length))
+            for i,c in enumerate(word):
+                char_input[0, 0, i] = char_vocab[c]
+
+            logits, rnn_state = session.run([m.logits, m.final_rnn_state],
+                                            {m.input: char_input,
+                                             m.initial_rnn_state: rnn_state})
+
+            prob = np.exp(logits)
+            prob /= np.sum(prob)
+            prob = prob.ravel()
+            ix = np.random.choice(range(len(prob)), p=prob)
+            print(word_vocab.token(ix) + ' : ' + str(prob[ix]))
+
+            '''
+            for i in range(5):
+                #prob = prob.ravel()
+                #ix = np.argmax(prob)
+                print(str(i) + " - " + word_vocab.token(ix) + ' : ' + str(prob[0][0][ix]))
+                prob[0][0][ix] = 0.0
+            '''
+
+        '''
         for i in range(FLAGS.num_samples):
             logits = logits / FLAGS.temperature
             prob = np.exp(logits)
@@ -111,6 +143,7 @@ def main(_):
                                          {m.input: char_input,
                                           m.initial_rnn_state: rnn_state})
             logits = np.array(logits)
+        '''
 
 
 if __name__ == "__main__":

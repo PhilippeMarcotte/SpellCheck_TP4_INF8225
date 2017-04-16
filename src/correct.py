@@ -14,7 +14,7 @@ from Preprocessing import load_dataset, DataReader
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model',   "./training/2017-04-16 04-06-44/epoch031_7.4874.model",    '(optional) filename of the model to load.')
+flags.DEFINE_string('load_model',   "./training/cv/epoch024_4.4068.model",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')

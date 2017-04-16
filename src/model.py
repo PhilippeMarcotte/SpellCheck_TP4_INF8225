@@ -88,7 +88,8 @@ def conv2dLayers(input_, kernels, kernel_features, scope='TDNN'):
     return output
 
 
-def inference_graph(char_vocab_size, word_vocab_size,
+def inference_graph(char_vocab_size, 
+                    word_vocab_size,
                     char_embed_size=15,
                     batch_size=20,
                     rnn_size=650,
@@ -150,7 +151,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
         input = input_,
         clear_char_embedding_padding=clear_char_embedding_padding,
         input_embedded=input_embedded,
-        #input_cnn=input_cnn,
+        output_cnn=output_cnn,
         initial_rnn_state=initial_rnn_state,
         final_rnn_state=final_rnn_state,
         rnn_outputs=outputs,

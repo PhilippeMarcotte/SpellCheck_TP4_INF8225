@@ -25,7 +25,6 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
 def linear(input_, output_size, scope=None):
     '''
     Linear map: output[k] = sum_i(Matrix[k, i] * args[i] ) + Bias[k]
-
     Args:
         args: a tensor or a list of 2D, batch x n, Tensors.
     output_size: int, second dimension of W[i].
@@ -54,7 +53,6 @@ def linear(input_, output_size, scope=None):
 
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
-
     t = sigmoid(Wy + b)
     z = t * g(Wy + b) + (1 - t) * y
     where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
@@ -74,7 +72,6 @@ def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'
 
 def tdnn(input_, kernels, kernel_features, scope='TDNN'):
     '''
-
     :input:           input float tensor of shape [(batch_size*num_unroll_steps) x max_word_length x embed_size]
     :kernels:         array of kernel sizes
     :kernel_features: array of kernel feature sizes (parallel to kernels)
@@ -111,7 +108,7 @@ def tdnn(input_, kernels, kernel_features, scope='TDNN'):
 def inference_graph(char_vocab_size, word_vocab_size,
                     char_embed_size=15,
                     batch_size=20,
-                    num_highway_layers=0,
+                    num_highway_layers=2,
                     num_rnn_layers=2,
                     rnn_size=650,
                     max_word_length=65,
@@ -142,27 +139,32 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     ''' Second, apply convolutions '''
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
-    output_cnn = input_embedded
-    #output_cnn = tdnn(input_embedded, kernels, kernel_features)
+    input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
-        output_cnn = highway(output_cnn, input_cnn.get_shape()[-1], num_layers=num_highway_layers)
+        input_cnn = highway(input_cnn, input_cnn.get_shape()[-1], num_layers=num_highway_layers)
 
     ''' Finally, do LSTM '''
     with tf.variable_scope('LSTM'):
-        cell = tf.contrib.rnn.BasicLSTMCell(rnn_size, state_is_tuple=True, forget_bias=0.0)
-        if dropout > 0.0:
-            cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1.-dropout)
+        def create_rnn_cell():
+            cell = tf.contrib.rnn.BasicLSTMCell(rnn_size, state_is_tuple=True, forget_bias=0.0)
+            if dropout > 0.0:
+                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1.-dropout)
+            return cell
+        
         if num_rnn_layers > 1:
-            cell = tf.contrib.rnn.MultiRNNCell([cell] * num_rnn_layers, state_is_tuple=True)
+            cell = tf.contrib.rnn.MultiRNNCell([create_rnn_cell() for _ in range(num_rnn_layers)], state_is_tuple=True)
+        else:
+            cell = create_rnn_cell()
 
         initial_rnn_state = cell.zero_state(batch_size, dtype=tf.float32)
 
-        output_cnn = tf.reshape(output_cnn, [batch_size, num_unroll_steps, -1])
-        output_cnn2 = [tf.squeeze(x, [1]) for x in tf.split(output_cnn, num_unroll_steps, 1)]
+        input_cnn = tf.reshape(input_cnn, [batch_size, num_unroll_steps, -1])
+        input_cnn2 = [tf.squeeze(x, [1]) for x in tf.split(input_cnn, num_unroll_steps, 1)]
 
-        outputs, final_rnn_state = tf.contrib.rnn.static_rnn(cell,output_cnn2, initial_state=initial_rnn_state, dtype=tf.float32)
+        outputs, final_rnn_state = tf.contrib.rnn.static_rnn(cell, input_cnn2,
+                                         initial_state=initial_rnn_state, dtype=tf.float32)
 
         # linear projection onto output (word) vocab
         logits = []
@@ -188,9 +190,9 @@ def loss_graph(logits, batch_size, num_unroll_steps):
 
     with tf.variable_scope('Loss'):
         targets = tf.placeholder(tf.int64, [batch_size, num_unroll_steps], name='targets')
-        target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps,1)]
+        target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps, 1)]
 
-        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list), name='loss')
+        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits, labels = target_list), name='loss')
 
     return adict(
         targets=targets,
@@ -248,8 +250,8 @@ if __name__ == '__main__':
         print('Model size is:', model_size())
 
         # need a fake variable to write scalar summary
-        tf.summary.scalar('fake', 0)
-        summary = tf.summary.merge_all()
-        writer = tf.summary.FileWriter('./tmp', graph=sess.graph)
+        tf.scalar_summary('fake', 0)
+        summary = tf.merge_all_summaries()
+        writer = tf.train.SummaryWriter('./tmp', graph=sess.graph)
         writer.add_summary(sess.run(summary))
         writer.flush()
