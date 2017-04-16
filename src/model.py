@@ -95,7 +95,9 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     max_word_length=65,
                     kernels         = [ 1,   2,   3,   4,   5,   6,   7],
                     kernel_features = [50, 100, 150, 200, 200, 200, 200],
-                    num_unroll_steps=35):
+                    num_unroll_steps=35,
+                    config=0,
+                    char_embedding_metadata=""):
 
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
@@ -104,7 +106,10 @@ def inference_graph(char_vocab_size, word_vocab_size,
     ''' First, embed characters '''
     with tf.variable_scope('Embedding'):
         char_embedding = tf.get_variable('char_embedding', [char_vocab_size, char_embed_size])
-
+        if config:
+            embedding = config.embeddings.add()
+            embedding.tensor_name = char_embedding.name
+            embedding.metadata_path = char_embedding_metadata
         ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
         of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
         zero embedding vector and ignores gradient updates. For that do the following in TF:

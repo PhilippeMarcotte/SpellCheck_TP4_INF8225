@@ -3,3 +3,4 @@ dataset/*
 .vscode/*
 tags
 *.pyc
+training/*

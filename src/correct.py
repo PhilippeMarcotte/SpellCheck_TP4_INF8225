@@ -14,7 +14,7 @@ from Preprocessing import load_dataset, DataReader
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model',   "./training/epoch024_7.4892.model",    '(optional) filename of the model to load.')
+flags.DEFINE_string('load_model',   "./training/2017-04-16 04-06-44/epoch031_7.4874.model",    '(optional) filename of the model to load.')
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
@@ -100,14 +100,14 @@ def main(_):
                                             {m.input: char_input,
                                              m.initial_rnn_state: rnn_state})
 
-            prob = np.array(logits)
             prob = np.exp(logits)
             prob /= np.sum(prob)
 
             for i in range(5):
-                ix = np.argmax(prob[0][0])
-                print(str(i) + " - " + word_vocab.tokenByIndex_[ix] + ' : ' + str(prob[0][0][ix]))
-                prob[0][0][ix] = 0.0
+                prob = prob.ravel()
+                ix = np.argmax(prob)
+                print(str(i) + " - " + word_vocab.tokenByIndex_[ix] + ' : ' + str(prob[ix]))
+                prob[ix] = 0.0
 
         '''
         for i in range(FLAGS.num_samples):
