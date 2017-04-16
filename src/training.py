@@ -41,7 +41,10 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
 
     print('initialized all dataset readers')
 
-    with tf.Graph().as_default(), tf.Session() as session:
+    config = tf.ConfigProto()
+    config.gpu_options.allocator_type = 'BFC'
+
+    with tf.Graph().as_default(), tf.Session(config=config) as session:
 
         # tensorflow seed must be inside graph
         tf.set_random_seed(seed)
