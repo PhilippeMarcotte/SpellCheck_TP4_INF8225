@@ -15,7 +15,8 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
          max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
          param_init=0.05, max_epochs=50, print_every=5):
     ''' Trains model from data '''
-    directory = TRAINING_DIR.format(time.strftime("%Y-%m-%d %H-%M-%S", time.gmtime()))
+    date = time.strftime("%Y-%m-%d %H-%M-%S", time.localtime())
+    directory = TRAINING_DIR.format(date)
     if not os.path.exists(directory):
         os.mkdir(directory)
         print('Created training directory', directory)

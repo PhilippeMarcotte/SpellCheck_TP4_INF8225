@@ -124,8 +124,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     ''' Second, apply convolutions '''
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
-    output_cnn = input_embedded
-    #output_cnn = conv2dLayers(input_embedded, kernels, kernel_features)
+    #output_cnn = input_embedded
+    output_cnn = conv2dLayers(input_embedded, kernels, kernel_features)
 
     ''' Finally, do LSTM '''
     with tf.variable_scope('LSTM'):
