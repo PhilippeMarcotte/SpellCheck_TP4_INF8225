@@ -1,12 +1,8 @@
 #!/bin/bash
 
-yum install git
+mkdir -p dataset/tar_archives
 
-git clone https://esiode:in9el106e2y@bitbucket.org/inf8225/tp4.git
-
-mkdir -p tp4/dataset/tar_archives
-
-cd tp4/dataset/tar_archives
+cd dataset/tar_archives
 
 wget http://www.statmt.org/lm-benchmark/1-billion-word-language-modeling-benchmark-r13output.tar.gz
 
