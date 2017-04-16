@@ -20,7 +20,7 @@ RE_APOSTROPHE_FILTER = re.compile(r'&#39;|[ʼ՚＇‘’‛❛❜ߴߵ`‵´ˊˋ{
 RE_LEFT_PARENTH_FILTER = re.compile(r'[\(\[\{\⁽\₍\❨\❪\﹙\（]', re.UNICODE)
 RE_RIGHT_PARENTH_FILTER = re.compile(r'[\)\]\}\⁾\₎\❩\❫\﹚\）]', re.UNICODE)
 ALLOWED_CURRENCIES = """¥£₪$€฿₨"""
-ALLOWED_PUNCTUATION = """-!?/;"'%&<>.()[]{}@#:,|=*"""
+ALLOWED_PUNCTUATION = """-!?/;"'%&<>.()[]@#:,|=*"""
 RE_BASIC_CLEANER = re.compile(r'[^\w\s{}{}]'.format(re.escape(ALLOWED_CURRENCIES), re.escape(ALLOWED_PUNCTUATION)), re.UNICODE)
 
 class Vocabulary:
@@ -71,6 +71,8 @@ def cleanup_dataset():
 def parse_dataset(training_proportion=0.7, heldout_proportion=0.15):
     char_vocab = Vocabulary()
     char_vocab.feed(' ')
+    char_vocab.feed('{')
+    char_vocab.feed('}')
 
     word_vocab = Vocabulary()
 
@@ -88,8 +90,9 @@ def parse_dataset(training_proportion=0.7, heldout_proportion=0.15):
                 for i in range(set_size):
                     for word in file.readline().split():
                         word_tokens[set_label].append(word_vocab.feed(word))
-
-                        char_array = [char_vocab.feed(c) for c in word]
+                        if word.find('{') >= 0:
+                            print("Uh Oh!")
+                        char_array = [char_vocab.feed(c) for c in ('{' + word + '}')]
                         char_tokens[set_label].append(char_array)
 
                         max_word_length = max(max_word_length, len(char_array))
@@ -224,19 +227,22 @@ class DataReader:
         self.word_tensor = word_tensor[:reduced_length]
         self.char_tensor = char_tensor[:reduced_length, :]
 
-
         self.amount_of_noise = 0.2 / max_word_length
         self.max_word_length = max_word_length
         self.batch_size =  batch_size
         self.num_unroll_steps = num_unroll_steps
     
-    def random_position(self, tensor):
-       return np.random.randint(low=0, high=len(tensor))
+    def random_position(self, word):
+        if np.argwhere(word == self.char_vocab.indexByToken_['}']) <= 2:
+            return 1
+        return np.random.randint(low=1, high=np.argwhere(word == self.char_vocab.indexByToken_['}']) - 1)
+
+    def random_char(self):
+        return np.random.randint(low=3, high=len(self.char_vocab.tokenByIndex_))
 
     def replace_random_character(self, word):
         random_char_position = self.random_position(word)
-        random_char_replacement = self.random_position(self.char_vocab.tokenByIndex_)
-        word[random_char_position] = random_char_replacement
+        word[random_char_position] = self.random_char()
         return word
     
     def delete_random_characeter(self, word):
@@ -246,12 +252,10 @@ class DataReader:
 
     def add_random_character(self, word):
         random_char_position = self.random_position(word)
-        random_char = self.random_position(self.char_vocab.tokenByIndex_)
-        word = np.insert(word, random_char_position, random_char)
+        word = np.insert(word, random_char_position, self.random_char())
         return word
     
     def transpose_random_characters(self, word):
-
         random_char_position = self.random_position(word)
         if random_char_position + 1 < len(word):
             word[random_char_position + 1], word[random_char_position] = word[random_char_position], word[random_char_position + 1]
@@ -261,19 +265,17 @@ class DataReader:
         print(np.random.uniform())
         corrupted_words = words.copy()
         for word in corrupted_words:
-
             if np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.replace_random_character(word)
                 
-            if np.random.uniform() < self.amount_of_noise * len(word):
+            if  np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.delete_random_characeter(word)
 
             if len(word) + 1 < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.add_random_character(word)
 
-            if np.random.uniform() < self.amount_of_noise * len(word):
+            if np.argwhere(word == self.char_vocab.indexByToken_['}']) > 2 and np.random.uniform() < self.amount_of_noise * len(word):
                 word = self.transpose_random_characters(word)
-                
         return corrupted_words
 
     def iter(self):
@@ -286,7 +288,7 @@ class DataReader:
 
         x_batches = list(np.transpose(x_batches, axes=(1, 0, 2, 3)))
         y_batches = list(np.transpose(y_batches, axes=(1, 0, 2)))
-
+        self.length = len(y_batches)
         assert len(x_batches) == len(y_batches)
 
         for x, y in zip(x_batches, y_batches):

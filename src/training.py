@@ -1,25 +1,33 @@
 import tensorflow as tf
+from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 import os
 import model
 import time
+import csv
 from Preprocessing import load_dataset, DataReader
 
 import model
 
-TRAINING_DIR = "./training"
+TRAINING_DIR = "./training/{}/"
 
 def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
          max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
-         param_init=0.05, max_epochs=25, print_every=5):
+         param_init=0.05, max_epochs=50, print_every=5):
     ''' Trains model from data '''
-
-    if not os.path.exists(TRAINING_DIR):
-        os.mkdir(TRAINING_DIR)
-        print('Created training directory', TRAINING_DIR)
+    directory = TRAINING_DIR.format(time.strftime("%Y-%m-%d %H-%M-%S", time.gmtime()))
+    if not os.path.exists(directory):
+        os.mkdir(directory)
+        print('Created training directory', directory)
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_dataset()
+
+    char_embedding_metadata = os.path.join(directory + "characters_embeddings.tsv")
+    with open(char_embedding_metadata, "w", encoding="utf-8") as metadata_file:
+        metadata_file.write('padding\n')
+        for i in range(1, char_vocab.size()):
+            metadata_file.write('%s\n' % (char_vocab.tokenByIndex_[i]))
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               batch_size, num_unroll_steps, char_vocab)
@@ -40,7 +48,7 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         # tensorflow seed must be inside graph
         tf.set_random_seed(seed)
         np.random.seed(seed=seed)
-
+        config = projector.ProjectorConfig()
         ''' build training graph '''
         initializer = tf.random_uniform_initializer(param_init, param_init)
         with tf.variable_scope("Model", initializer=initializer):
@@ -53,7 +61,9 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
                     max_word_length=max_word_length,
                     kernels=eval(kernels),
                     kernel_features=eval(kernel_features),
-                    num_unroll_steps=num_unroll_steps)
+                    num_unroll_steps=num_unroll_steps,
+                    config=config,
+                    char_embedding_metadata=char_embedding_metadata)
             train_model.update(model.loss_graph(train_model.logits, batch_size, num_unroll_steps))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
@@ -88,7 +98,7 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
         session.run(train_model.clear_char_embedding_padding)
         print('Created and initialized fresh model. Size:', model.model_size())
 
-        summary_writer = tf.summary.FileWriter(TRAINING_DIR, graph=session.graph)
+        summary_writer = tf.summary.FileWriter(directory, graph=session.graph)
 
         ''' take learning rate from CLI, not from saved graph '''
         session.run(
@@ -158,16 +168,19 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
             print("train loss = %6.8f, perplexity = %6.8f" % (avg_train_loss, np.exp(avg_train_loss)))
             print("validation loss = %6.8f, perplexity = %6.8f" % (avg_valid_loss, np.exp(avg_valid_loss)))
 
-            save_as = '%s/epoch%03d_%.4f.model' % (TRAINING_DIR, epoch, avg_valid_loss)
+            save_as = '%s/epoch%03d_%.4f.model' % (directory, epoch, avg_valid_loss)
             saver.save(session, save_as)
             print('Saved model', save_as)
 
             ''' write out summary events '''
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
-                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss)
-            ])
+                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
+                tf.Summary.Value(tag="train_perplexity", simple_value=np.exp(avg_train_loss)),
+                tf.Summary.Value(tag="valid_perplexity", simple_value=np.exp(avg_valid_loss))])
             summary_writer.add_summary(summary, step)
+
+            projector.visualize_embeddings(summary_writer, config)
 
             ''' decide if need to decay learning rate '''
             if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - decay_when:
