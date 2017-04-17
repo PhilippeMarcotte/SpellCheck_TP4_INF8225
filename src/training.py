@@ -9,22 +9,50 @@ from data_reader import load_data, DataReader
 
 import model
 
-TRAINING_DIR = "./training/{}/"
-DATA_DIR = "./data"
-MAX_WORD_LENGTH = 65
+flags = tf.flags
 
-def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=650, kernels="[1,2,3,4,5,6,7]", kernel_features="[50,100,150,200,200,200,200]",
-         max_grad_norm=5.0, learning_rate=1.0, learning_rate_decay=0.5, decay_when=1.0, seed=3435,
-         param_init=0.05, max_epochs=50, print_every=5):
+# data
+flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
+flags.DEFINE_string('train_dir',   './training/{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+
+# model params
+flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
+flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
+flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
+flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
+flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
+flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
+flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
+
+# optimization
+flags.DEFINE_float  ('learning_rate_decay', 0.5,  'learning rate decay')
+flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
+flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexity does not improve by more than this much')
+flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
+flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
+flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
+flags.DEFINE_integer('max_epochs',          25,   'number of full passes through the training data')
+flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
+flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
+
+# bookkeeping
+flags.DEFINE_integer('seed',           3435, 'random number generator seed')
+flags.DEFINE_integer('print_every',    5,    'how often to print current loss')
+flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
+
+FLAGS = flags.FLAGS
+
+def main(_):
     ''' Trains model from data '''
     date = time.strftime("%Y-%m-%d %H-%M-%S", time.localtime())
-    directory = TRAINING_DIR.format(date)
+    directory = FLAGS.train_dir.format(date)
     if not os.path.exists(directory):
         os.mkdir(directory)
         print('Created training directory', directory)
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
-        load_data(DATA_DIR, 65)
+        load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
 
     char_embedding_metadata = os.path.join(directory + "characters_embeddings.tsv")
     with open(char_embedding_metadata, "w", encoding="utf-8") as metadata_file:
@@ -33,13 +61,13 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
             metadata_file.write('%s\n' % (char_vocab.token(i)))
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
-                              batch_size, num_unroll_steps, char_vocab)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
 
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
-                              batch_size, num_unroll_steps, char_vocab)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                              batch_size, num_unroll_steps, char_vocab)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
 
     print('initialized all dataset readers')
 
@@ -49,32 +77,35 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
     with tf.Graph().as_default(), tf.Session(config=config) as session:
 
         # tensorflow seed must be inside graph
-        tf.set_random_seed(seed)
-        np.random.seed(seed=seed)
+        tf.set_random_seed(FLAGS.seed)
+        np.random.seed(seed=FLAGS.seed)
         config = projector.ProjectorConfig()
         ''' build training graph '''
-        initializer = tf.random_uniform_initializer(param_init, param_init)
+        initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
                     char_vocab_size=char_vocab.size,
                     word_vocab_size=word_vocab.size,
-                    char_embed_size=char_embed_size,
-                    batch_size=batch_size,
-                    rnn_size=rnn_size,
+                    char_embed_size=FLAGS.char_embed_size,
+                    batch_size=FLAGS.batch_size,
+                    num_highway_layers=FLAGS.highway_layers,
+                    num_lstm_layers=FLAGS.rnn_layers,
+                    rnn_size=FLAGS.rnn_size,
                     max_word_length=max_word_length,
-                    kernels=eval(kernels),
-                    kernel_features=eval(kernel_features),
-                    num_unroll_steps=num_unroll_steps,
+                    kernels=eval(FLAGS.kernels),
+                    kernel_features=eval(FLAGS.kernel_features),
+                    num_unroll_steps=FLAGS.num_unroll_steps,
+                    dropout=FLAGS.dropout,
                     config=config,
                     char_embedding_metadata=char_embedding_metadata)
-            train_model.update(model.loss_graph(train_model.logits, batch_size, num_unroll_steps))
+            train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
             # we need it to reproduce how the original Torch code optimizes. Without this, our gradients will be
             # much smaller (i.e. 35 times smaller) and to get system to learn we'd have to scale learning rate and max_grad_norm appropriately.
             # Thus, scaling gradients so that this trainer is exactly compatible with the original
-            train_model.update(model.training_graph(train_model.loss * num_unroll_steps,
-                    learning_rate, max_grad_norm))
+            train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
+                    FLAGS.learning_rate, FLAGS.max_grad_norm))
 
         # create saver before creating more graph nodes, so that we do not save any vars defined below
         saver = tf.train.Saver(max_to_keep=50)
@@ -84,34 +115,37 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
             valid_model = model.inference_graph(
                     char_vocab_size=char_vocab.size,
                     word_vocab_size=word_vocab.size,
-                    char_embed_size=char_embed_size,
-                    batch_size=batch_size,
-                    rnn_size=rnn_size,
+                    char_embed_size=FLAGS.char_embed_size,
+                    batch_size=FLAGS.batch_size,
+                    num_highway_layers=FLAGS.highway_layers,
+                    num_lstm_layers=FLAGS.rnn_layers,
+                    rnn_size=FLAGS.rnn_size,
                     max_word_length=max_word_length,
-                    kernels=eval(kernels),
-                    kernel_features=eval(kernel_features),
-                    num_unroll_steps=num_unroll_steps)
-            valid_model.update(model.loss_graph(valid_model.logits, batch_size, num_unroll_steps))
+                    kernels=eval(FLAGS.kernels),
+                    kernel_features=eval(FLAGS.kernel_features),
+                    num_unroll_steps=FLAGS.num_unroll_steps,
+                    dropout=0.0)
+            valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
-        '''if load_model:
-            saver.restore(session, load_model)
-            print('Loaded model from', load_model, 'saved at global step', train_model.global_step.eval())
-        else:'''
-        tf.global_variables_initializer().run()
-        session.run(train_model.clear_char_embedding_padding)
-        print('Created and initialized fresh model. Size:', model.model_size)
+        if FLAGS.load_model:
+            saver.restore(session, FLAGS.load_model)
+            print('Loaded model from', FLAFS.load_model, 'saved at global step', train_model.global_step.eval())
+        else:
+            tf.global_variables_initializer().run()
+            session.run(train_model.clear_char_embedding_padding)
+            print('Created and initialized fresh model. Size:', model.model_size)
 
         summary_writer = tf.summary.FileWriter(directory, graph=session.graph)
 
         ''' take learning rate from CLI, not from saved graph '''
         session.run(
-            tf.assign(train_model.learning_rate, learning_rate),
+            tf.assign(train_model.learning_rate, FLAGS.learning_rate),
         )
 
         ''' training starts here '''
         best_valid_loss = None
         rnn_state = session.run(train_model.initial_rnn_state)
-        for epoch in range(max_epochs):
+        for epoch in range(FLAGS.max_epochs):
             epoch_start_time = time.time()
             avg_train_loss = 0.0
             count = 0
@@ -136,7 +170,7 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
 
                 time_elapsed = time.time() - start_time
 
-                if count % print_every == 0:
+                if count % FLAGS.print_every == 0:
                     print('%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (step,
                                                             epoch, count,
                                                             train_reader.length,
@@ -186,11 +220,11 @@ def main(file, batch_size=20, num_unroll_steps=35, char_embed_size=15, rnn_size=
             projector.visualize_embeddings(summary_writer, config)
 
             ''' decide if need to decay learning rate '''
-            if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - decay_when:
+            if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - FLAGS.decay_when:
                 print('validation perplexity did not improve enough, decay learning rate')
                 current_learning_rate = session.run(train_model.learning_rate)
                 print('learning rate was:', current_learning_rate)
-                current_learning_rate *= learning_rate_decay
+                current_learning_rate *= FLAGS.learning_rate_decay
                 if current_learning_rate < 1.e-5:
                     print('learning rate too small - stopping now')
                     break
