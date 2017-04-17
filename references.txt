@@ -27,3 +27,6 @@ http://colah.github.io/posts/2015-08-Understanding-LSTMs/
 
 RECURRENT NEURAL NETWORK REGULARIZATION
 https://arxiv.org/pdf/1409.2329.pdf
+
+Word2Vec
+http://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf

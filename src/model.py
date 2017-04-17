@@ -51,6 +51,24 @@ def linear(input_, output_size, scope=None):
 
     return tf.matmul(input_, tf.transpose(matrix)) + bias_term
 
+def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
+    """Highway Network (cf. http://arxiv.org/abs/1505.00387).
+    t = sigmoid(Wy + b)
+    z = t * g(Wy + b) + (1 - t) * y
+    where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
+    """
+
+    with tf.variable_scope(scope):
+        for idx in range(num_layers):
+            g = f(linear(input_, size, scope='highway_lin_%d' % idx))
+
+            t = tf.sigmoid(linear(input_, size, scope='highway_gate_%d' % idx) + bias)
+
+            output = t * g + (1. - t) * input_
+            input_ = output
+
+    return output
+
 
 def conv2dLayers(input_, kernels, kernel_features, scope='TDNN'):
     '''
@@ -97,6 +115,9 @@ def inference_graph(char_vocab_size,
                     kernels         = [ 1,   2,   3,   4,   5,   6,   7],
                     kernel_features = [50, 100, 150, 200, 200, 200, 200],
                     num_unroll_steps=35,
+                    num_lstm_layers = 2,
+                    num_highway_layers = 2,
+                    dropout=0.5,
                     config=0,
                     char_embedding_metadata=""):
 
@@ -128,9 +149,17 @@ def inference_graph(char_vocab_size,
     #output_cnn = input_embedded
     output_cnn = conv2dLayers(input_embedded, kernels, kernel_features)
 
+    output_cnn = highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
+
     ''' Finally, do LSTM '''
     with tf.variable_scope('LSTM'):
-        cell = tf.contrib.rnn.BasicLSTMCell(rnn_size, state_is_tuple=True, forget_bias=0.0)
+        def create_rnn_cell():
+            cell = tf.contrib.rnn.BasicLSTMCell(rnn_size, state_is_tuple=True, forget_bias=0.0)
+            if dropout:
+                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1.-dropout)
+            return cell
+
+        cell = tf.contrib.rnn.MultiRNNCell([create_rnn_cell() for _ in range(num_lstm_layers)], state_is_tuple=True)
 
         initial_rnn_state = cell.zero_state(batch_size, dtype=tf.float32)
 

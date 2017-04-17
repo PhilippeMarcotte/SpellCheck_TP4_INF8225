@@ -180,17 +180,17 @@ class DataReader:
         print(np.random.uniform())
         corrupted_words = words.copy()
         for word in corrupted_words:
-            if np.random.uniform() < self.amount_of_noise * len(word):
-                word = self.replace_random_character(word)
-                
-            if  np.random.uniform() < self.amount_of_noise * len(word):
-                word = self.delete_random_characeter(word)
-
-            if len(word) + 1 < self.max_word_length and np.random.uniform() < self.amount_of_noise * len(word):
-                word = self.add_random_character(word)
-
-            if np.argwhere(word == self.char_vocab.indexByToken_['}']) > 2 and np.random.uniform() < self.amount_of_noise * len(word):
-                word = self.transpose_random_characters(word)
+            corruption = np.random.uniform()
+            if corruption < 0.25:
+                corruption *= 4
+                if corruption < 0.25:
+                    word = self.replace_random_character(word)
+                else if corruption < 0.5:
+                    word = self.delete_random_characeter(word)
+                else if len(word) + 1 < self.max_word_length and corruption < 0.75:
+                    word = self.add_random_character(word)
+                else if np.argwhere(word == self.char_vocab.indexByToken_['}']) > 2 and corruption < 1.0:
+                    word = self.transpose_random_characters(word)
         return corrupted_words
 
     def iter(self):
