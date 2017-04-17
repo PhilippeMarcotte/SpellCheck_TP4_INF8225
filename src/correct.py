@@ -8,13 +8,13 @@ import numpy as np
 import tensorflow as tf
 
 import model
-from Preprocessing import load_dataset, DataReader
+from data_reader import load_data, DataReader
 
 
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model',   "./training/cv/epoch024_4.4068.model",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('load_model', "./training/2017-04-16_15-27-33/epoch032_6.5328.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
@@ -51,7 +51,7 @@ def main(_):
         return -1
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
-        load_dataset()
+        load_data(FLAGS.data_dir, FLAGS.max_word_length)
 
     print('initialized test dataset reader')
 
@@ -64,8 +64,8 @@ def main(_):
         ''' build inference graph '''
         with tf.variable_scope("Model"):
             m = model.inference_graph(
-                    char_vocab_size=char_vocab.size(),
-                    word_vocab_size=word_vocab.size(),
+                    char_vocab_size=char_vocab.size,
+                    word_vocab_size=word_vocab.size,
                     char_embed_size=FLAGS.char_embed_size,
                     batch_size=1,
                     rnn_size=FLAGS.rnn_size,
@@ -83,7 +83,7 @@ def main(_):
 
         ''' training starts here '''
         rnn_state = session.run(m.initial_rnn_state)
-        logits = np.ones((word_vocab.size(),))
+        logits = np.ones((word_vocab.size,))
 
         while True:
 
@@ -94,7 +94,7 @@ def main(_):
 
             char_input = np.zeros((1, 1, max_word_length))
             for i,c in enumerate(word):
-                char_input[0, 0, i] = char_vocab.indexByToken_[c]
+                char_input[0, 0, i] = char_vocab[c]
 
             logits, rnn_state = session.run([m.logits, m.final_rnn_state],
                                             {m.input: char_input,
@@ -104,38 +104,9 @@ def main(_):
             prob /= np.sum(prob)
 
             for i in range(5):
-                prob = prob.ravel()
                 ix = np.argmax(prob)
-                print(str(i) + " - " + word_vocab.tokenByIndex_[ix] + ' : ' + str(prob[ix]))
-                prob[ix] = 0.0
-
-        '''
-        for i in range(FLAGS.num_samples):
-
-            logits = logits / FLAGS.temperature
-            prob = np.exp(logits)
-            prob /= np.sum(prob)
-            prob = prob.ravel()
-            ix = np.random.choice(range(len(prob)), p=prob)
-
-            word = word_vocab.token(ix)
-            if word == '|':  # EOS
-                print('<unk>', end=' ')
-            elif word == '+':
-                print('\n')
-            else:
-                print(word, end=' ')
-
-            char_input = np.zeros((1, 1, max_word_length))
-            for i,c in enumerate('{' + word + '}'):
-                char_input[0,0,i] = char_vocab[c]
-
-            logits, rnn_state = session.run([m.logits, m.final_rnn_state],
-                                         {m.input: char_input,
-                                          m.initial_rnn_state: rnn_state})
-            logits = np.array(logits)
-        '''
-
+                print(str(i) + " - " + word_vocab.token(ix) + ' : ' + str(prob[0][0][ix]))
+                prob[0][0][ix] = 0.0
 
 if __name__ == "__main__":
     tf.app.run()
