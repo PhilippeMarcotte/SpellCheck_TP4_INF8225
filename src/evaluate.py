@@ -3,8 +3,10 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from model import Model
+from model import Model, ModelUsage
 from data_reader import load_data, DataReader
+
+import argparse
 
 flags = tf.flags
 
@@ -38,13 +40,21 @@ FLAGS = flags.FLAGS
 def main(_):
     ''' Loads trained model and evaluates it on test split '''
 
-    if FLAGS.load_model is None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--model", help="Model to load")
+    args = parser.parse_args()
+    
+    ''' Loads trained model and evaluates it on test split '''
+
+    if args.model is None:
         print('Please specify checkpoint file to load model from')
         return -1
-
-    if not os.path.exists(FLAGS.load_model + '.meta'):
-        print('Checkpoint file not found', FLAGS.load_model)
+    
+    if not os.path.exists(args.model + '.meta'):
+        print('Checkpoint file not found', args.model)
         return -1
+
+    model_path = args.model
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, FLAGS.EOS)
@@ -62,11 +72,14 @@ def main(_):
 
         ''' build inference graph '''
         with tf.variable_scope("Model"):
-            m = Model(FLAGS, char_vocab, word_vocab, max_word_length)
+            m = Model(FLAGS, char_vocab, word_vocab, max_word_length, ModelUsage.TEST)
+
+            # we need global step only because we want to read it from the model
+            global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
         saver = tf.train.Saver()
-        saver.restore(session, FLAGS.load_model)
-        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.load_model), 'saved at global step', m.global_step.eval())
+        saver.restore(session, model_path)
+        print('Loaded model from', tf.train.latest_checkpoint(model_path), 'saved at global step', global_step.eval())
 
         ''' test starts here '''
         rnn_state = session.run(m.initial_rnn_state)

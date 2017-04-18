@@ -12,7 +12,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/no_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/0.25_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -58,6 +58,12 @@ def main(_):
         metadata_file.write('padding\n')
         for i in range(1, char_vocab.size):
             metadata_file.write('%s\n' % (char_vocab.token(i)))
+    
+    word_embedding_metadata = os.path.join(directory + "words_embeddings.tsv")   
+    with open(word_embedding_metadata, "w", encoding="utf-8") as metadata_file:
+        metadata_file.write('padding\n')
+        for i in range(1, word_vocab.size):
+            metadata_file.write('%s\n' % (word_vocab.token(i)))
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
