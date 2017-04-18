@@ -6,8 +6,7 @@ import model
 import time
 import csv
 from data_reader import load_data, DataReader
-
-import model
+from model import Model
 
 flags = tf.flags
 
@@ -80,7 +79,16 @@ def main(_):
         tf.set_random_seed(FLAGS.seed)
         np.random.seed(seed=FLAGS.seed)
         config = projector.ProjectorConfig()
+
+        initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
+
+        with tf.variable_scope("Model", initializer=initializer):
+            train_model = Model(FLAGS, char_vocab, word_vocab, max_word_length)
+        with tf.variable_scope("Model", reuse=True):
+            valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length)
+
         ''' build training graph '''
+        '''
         initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
@@ -106,11 +114,13 @@ def main(_):
             # Thus, scaling gradients so that this trainer is exactly compatible with the original
             train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
                     FLAGS.learning_rate, FLAGS.max_grad_norm))
+            '''
 
         # create saver before creating more graph nodes, so that we do not save any vars defined below
         saver = tf.train.Saver(max_to_keep=50)
 
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
+        '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
                     char_vocab_size=char_vocab.size,
@@ -126,6 +136,7 @@ def main(_):
                     num_unroll_steps=FLAGS.num_unroll_steps,
                     dropout=0.0)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
+        '''
 
         if FLAGS.load_model:
             saver.restore(session, FLAGS.load_model)

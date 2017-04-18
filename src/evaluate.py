@@ -3,17 +3,19 @@ import time
 import numpy as np
 import tensorflow as tf
 
-import model
-from Preprocessing import load_dataset, DataReader
+from model import Model
+from data_reader import load_data, DataReader
 
 flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
 flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('load_model',   "./training/2017-04-16_10-47-07/epoch017_7.4976.model",    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('load_model', "./training/2017-04-16_15-27-33/epoch032_6.5328.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
+flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
+flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
 flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
 flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
 flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
@@ -45,7 +47,7 @@ def main(_):
         return -1
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
-        load_dataset()
+        load_data(FLAGS.data_dir, FLAGS.max_word_length, FLAGS.EOS)
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps, char_vocab)
@@ -60,23 +62,11 @@ def main(_):
 
         ''' build inference graph '''
         with tf.variable_scope("Model"):
-            m = model.inference_graph(
-                    char_vocab_size=char_vocab.size(),
-                    word_vocab_size=word_vocab.size(),
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=FLAGS.batch_size,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps)
-            m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
-
-            global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
+            m = Model(FLAGS, char_vocab, word_vocab, max_word_length)
 
         saver = tf.train.Saver()
         saver.restore(session, FLAGS.load_model)
-        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.load_model), 'saved at global step', global_step.eval())
+        print('Loaded model from', tf.train.latest_checkpoint(FLAGS.load_model), 'saved at global step', m.global_step.eval())
 
         ''' test starts here '''
         rnn_state = session.run(m.initial_rnn_state)
@@ -101,7 +91,6 @@ def main(_):
 
         print("test loss = %6.8f, perplexity = %6.8f" % (avg_loss, np.exp(avg_loss)))
         print("test samples:", count*FLAGS.batch_size, "time elapsed:", time_elapsed, "time per one batch:", time_elapsed/count)
-
 
 if __name__ == "__main__":
     tf.app.run()
