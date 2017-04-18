@@ -198,11 +198,10 @@ class Model:
 
         ''' Second, apply convolutions '''
        
-        #output_cnn = input_embedded
         # [batch_size x num_unroll_steps, cnn_size]  where cnn_size=sum(kernel_features)
         output_cnn = self.conv2dLayers(input_embedded, kernels, kernel_features)
 
-        #output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
+        output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
 
         ''' Finally, do LSTM '''
         with tf.variable_scope('LSTM'):

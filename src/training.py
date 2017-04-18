@@ -12,7 +12,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/no_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/no_corruption_2_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
