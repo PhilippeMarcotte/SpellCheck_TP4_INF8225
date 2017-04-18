@@ -14,7 +14,7 @@ from data_reader import load_data, DataReader
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model', "./training/2017-04-16_15-27-33/epoch032_6.5328.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('load_model', "./training/0.5_corruuption_2017-04-17 16-31-48/epoch024_4.4010.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
@@ -26,11 +26,13 @@ flags.DEFINE_integer('highway_layers',  2,                              'number 
 flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
 flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
 flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
-flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
+flags.DEFINE_integer('lstm_layers',      2,                              'number of layers in the LSTM')
+flags.DEFINE_integer('max_epochs',      25,                             'number of full passes through the training data')
+flags.DEFINE_integer('batch_size',      20,                             'number of sequences to train on in parallel')
+flags.DEFINE_integer('num_unroll_steps',35,                             'number of timesteps to unroll for')
 flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
-
-# optimization
-flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
+flags.DEFINE_float  ('max_grad_norm',   5.0,                            'normalize gradients at')
+flags.DEFINE_integer('max_word_length', 65,                             'maximum word length')
 
 # bookkeeping
 flags.DEFINE_integer('seed',           3435, 'random number generator seed')
@@ -56,7 +58,6 @@ def main(_):
     print('initialized test dataset reader')
 
     with tf.Graph().as_default(), tf.Session() as session:
-
         # tensorflow seed must be inside graph
         tf.set_random_seed(FLAGS.seed)
         np.random.seed(seed=FLAGS.seed)
@@ -68,11 +69,14 @@ def main(_):
                     word_vocab_size=word_vocab.size,
                     char_embed_size=FLAGS.char_embed_size,
                     batch_size=1,
+                    num_highway_layers=FLAGS.highway_layers,
+                    num_lstm_layers=FLAGS.lstm_layers,
                     rnn_size=FLAGS.rnn_size,
                     max_word_length=max_word_length,
                     kernels=eval(FLAGS.kernels),
                     kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=1)
+                    num_unroll_steps=1,
+                    dropout=0)
 
             # we need global step only because we want to read it from the model
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')

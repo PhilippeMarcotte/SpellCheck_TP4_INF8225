@@ -13,7 +13,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/0.5_corruuption_{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -197,7 +197,7 @@ def main(_):
                     valid_model.initial_rnn_state: rnn_state,
                 })
 
-                if count % print_every == 0:
+                if count % FLAGS.print_every == 0:
                     print("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
                 avg_valid_loss += loss / valid_reader.length
 
