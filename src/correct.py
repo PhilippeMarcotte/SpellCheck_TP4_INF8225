@@ -7,20 +7,21 @@ import time
 import numpy as np
 import tensorflow as tf
 
-import model
+from model import Model
 from data_reader import load_data, DataReader
 
 
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model', "./training/2017-04-16_15-27-33/epoch032_6.5328.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
-# we need data only to compute vocabulary
+flags.DEFINE_string('load_model', "./training/2017-04-17 20-56-12/epoch004_4.9581.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
 flags.DEFINE_float('temperature', 1.0, 'sampling temperature')
 
 # model params
+flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
+flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
 flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
 flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
 flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
@@ -30,6 +31,8 @@ flags.DEFINE_integer('rnn_layers',      2,                              'number 
 flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
 
 # optimization
+flags.DEFINE_integer('num_unroll_steps',    1,   'number of timesteps to unroll for')
+flags.DEFINE_integer('batch_size',          1,   'number of sequences to train on in parallel')
 flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
 
 # bookkeeping
@@ -63,23 +66,11 @@ def main(_):
 
         ''' build inference graph '''
         with tf.variable_scope("Model"):
-            m = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=1,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=1)
-
-            # we need global step only because we want to read it from the model
-            global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
+            m = Model(FLAGS, char_vocab, word_vocab, max_word_length)
 
         saver = tf.train.Saver()
         saver.restore(session, FLAGS.load_model)
-        print('Loaded model from', FLAGS.load_model, 'saved at global step', global_step.eval())
+        print('Loaded model from', FLAGS.load_model, 'saved at global step', m.global_step.eval())
 
         ''' training starts here '''
         rnn_state = session.run(m.initial_rnn_state)

@@ -11,7 +11,7 @@ flags = tf.flags
 # data
 flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
 flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('load_model', "./training/2017-04-16_15-27-33/epoch032_6.5328.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+flags.DEFINE_string('load_model', "./training/2017-04-17 20-56-12/epoch004_4.9581.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
 flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
