@@ -3,7 +3,7 @@ from __future__ import division
 
 
 import tensorflow as tf
-
+from tensorflow.contrib.tensorboard.plugins import projector
 
 class adict(dict):
     ''' Attribute dictionary - a convenience data structure, similar to SimpleNamespace in python 3.3
@@ -14,21 +14,26 @@ class adict(dict):
         self.__dict__ = self
 
 class Model:
-    def __init__(self, flags, char_vocab, word_vocab, max_word_length):
-            self.inference_graph(
-                        char_vocab_size=char_vocab.size,
-                        word_vocab_size=word_vocab.size,
-                        char_embed_size=flags.char_embed_size,
-                        batch_size=flags.batch_size,
-                        num_highway_layers=flags.highway_layers,
-                        num_lstm_layers=flags.rnn_layers,
-                        rnn_size=flags.rnn_size,
-                        max_word_length=max_word_length,
-                        kernels=eval(flags.kernels),
-                        kernel_features=eval(flags.kernel_features),
-                        num_unroll_steps=flags.num_unroll_steps,
-                        dropout=flags.dropout)
-
+    def __init__(self, flags, char_vocab, word_vocab, max_word_length, training=True, metadata = ""):
+        if metadata != "":
+            self.projector_config = projector.ProjectorConfig()
+        else:
+            self.projector_config = 0
+        self.metadata = metadata
+        self.inference_graph(
+                    char_vocab_size=char_vocab.size,
+                    word_vocab_size=word_vocab.size,
+                    char_embed_size=flags.char_embed_size,
+                    batch_size=flags.batch_size,
+                    num_highway_layers=flags.highway_layers,
+                    num_lstm_layers=flags.rnn_layers,
+                    rnn_size=flags.rnn_size,
+                    max_word_length=max_word_length,
+                    kernels=eval(flags.kernels),
+                    kernel_features=eval(flags.kernel_features),
+                    num_unroll_steps=flags.num_unroll_steps,
+                    dropout=flags.dropout)
+        if training:
             self.loss_graph(
                         logits=self.logits, 
                         batch_size=flags.batch_size, 
@@ -55,12 +60,12 @@ class Model:
             args: a tensor or a list of 2D, batch x n, Tensors.
         output_size: int, second dimension of W[i].
         scope: VariableScope for the created subgraph; defaults to "Linear".
-    Returns:
-        A 2D Tensor with shape [batch x output_size] equal to
-        sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
-    Raises:
-        ValueError: if some of the arguments has unspecified or wrong shape.
-    '''
+        Returns:
+            A 2D Tensor with shape [batch x output_size] equal to
+            sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
+        Raises:
+            ValueError: if some of the arguments has unspecified or wrong shape.
+        '''
 
         shape = input_.get_shape().as_list()
         if len(shape) != 2:
@@ -143,9 +148,7 @@ class Model:
                         kernels         = [ 1,   2,   3,   4,   5,   6,   7],
                         kernel_features = [50, 100, 150, 200, 200, 200, 200],
                         num_unroll_steps=35,
-                        dropout=0.5,
-                        config=0,
-                        char_embedding_metadata=""):
+                        dropout=0.0):
 
         assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
@@ -154,10 +157,10 @@ class Model:
         ''' First, embed characters '''
         with tf.variable_scope('Embedding'):
             char_embedding = tf.get_variable('char_embedding', [char_vocab_size, char_embed_size])
-            if config:
-                embedding = config.embeddings.add()
+            if self.projector_config:
+                embedding = self.projector_config.embeddings.add()
                 embedding.tensor_name = char_embedding.name
-                embedding.metadata_path = char_embedding_metadata
+                embedding.metadata_path = self.metadata
             ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
             of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
             zero embedding vector and ignores gradient updates. For that do the following in TF:
@@ -175,7 +178,7 @@ class Model:
         #output_cnn = input_embedded
         output_cnn = self.conv2dLayers(input_embedded, kernels, kernel_features)
 
-        output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
+        #output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
 
         ''' Finally, do LSTM '''
         with tf.variable_scope('LSTM'):

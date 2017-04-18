@@ -12,7 +12,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/0.5_corruuption_{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/0.5_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -31,7 +31,7 @@ flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexit
 flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
 flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
 flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
-flags.DEFINE_integer('max_epochs',          25,   'number of full passes through the training data')
+flags.DEFINE_integer('max_epochs',          50,   'number of full passes through the training data')
 flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
 flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
 
@@ -78,14 +78,13 @@ def main(_):
         # tensorflow seed must be inside graph
         tf.set_random_seed(FLAGS.seed)
         np.random.seed(seed=FLAGS.seed)
-        config = projector.ProjectorConfig()
 
         initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
 
         with tf.variable_scope("Model", initializer=initializer):
-            train_model = Model(FLAGS, char_vocab, word_vocab, max_word_length)
+            train_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, char_embedding_metadata)
         with tf.variable_scope("Model", reuse=True):
-            valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length)
+            valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, char_embedding_metadata)
 
         ''' build training graph '''
         '''

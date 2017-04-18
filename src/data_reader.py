@@ -169,8 +169,8 @@ class DataReader:
         corrupted_words = words.copy()
         for word in corrupted_words:
             corruption = np.random.uniform()
-            if corruption < 0.50:
-                corruption *= 2
+            if corruption < 0.25:
+                corruption *= 4
                 if corruption < 0.25:
                     word = self.replace_random_character(word)
                 elif corruption < 0.5:
@@ -183,11 +183,11 @@ class DataReader:
 
     def iter(self):
 
-        #ydata = self.word_tensor.copy()
-        ydata = np.zeros_like(self.word_tensor)
-        ydata[:-1] = self.word_tensor[1:].copy()
-        ydata[-1] = self.word_tensor[0].copy()
-        corrupted_char_tensor = self.char_tensor#self.corrupt(self.char_tensor)
+        ydata = self.word_tensor.copy()
+        #ydata = np.zeros_like(self.word_tensor)
+        #ydata[:-1] = self.word_tensor[1:].copy()
+        #ydata[-1] = self.word_tensor[0].copy()
+        corrupted_char_tensor = self.corrupt(self.char_tensor)
 
         x_batches = corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
         y_batches = ydata.reshape([self.batch_size, -1, self.num_unroll_steps])
