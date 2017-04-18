@@ -187,7 +187,7 @@ class DataReader:
         #ydata = np.zeros_like(self.word_tensor)
         #ydata[:-1] = self.word_tensor[1:].copy()
         #ydata[-1] = self.word_tensor[0].copy()
-        corrupted_char_tensor = self.corrupt(self.char_tensor)
+        corrupted_char_tensor = self.char_tensor#self.corrupt(self.char_tensor)
 
         x_batches = corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
         y_batches = ydata.reshape([self.batch_size, -1, self.num_unroll_steps])

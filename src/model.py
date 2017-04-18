@@ -4,6 +4,13 @@ from __future__ import division
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
+from enum import Enum
+
+class ModelUsage(Enum):
+    TRAIN = 0
+    VALIDATE = 1
+    TEST = 2
+    USE = 3
 
 class adict(dict):
     ''' Attribute dictionary - a convenience data structure, similar to SimpleNamespace in python 3.3
@@ -14,43 +21,55 @@ class adict(dict):
         self.__dict__ = self
 
 class Model:
-    def __init__(self, flags, char_vocab, word_vocab, max_word_length, training=True, metadata = ""):
+    def __init__(self, flags, char_vocab, word_vocab, max_word_length, model_usage=ModelUsage.TRAIN, metadata = ""):
+        self.flags = flags
+        self.char_vocab = char_vocab
+        self.word_vocab = word_vocab
+        self.max_word_length = max_word_length
+        self.model_usage = model_usage
         if metadata != "":
             self.projector_config = projector.ProjectorConfig()
         else:
             self.projector_config = 0
         self.metadata = metadata
-        self.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=flags.char_embed_size,
-                    batch_size=flags.batch_size,
-                    num_highway_layers=flags.highway_layers,
-                    num_lstm_layers=flags.rnn_layers,
-                    rnn_size=flags.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(flags.kernels),
-                    kernel_features=eval(flags.kernel_features),
-                    num_unroll_steps=flags.num_unroll_steps,
-                    dropout=flags.dropout)
-        if training:
-            self.loss_graph(
+
+        constructors = {
+            ModelUsage.TRAIN : self.construct_training_graphs,
+            ModelUsage.VALIDATE : self.construct_test_graphs,
+            ModelUsage.TEST : self.construct_test_graphs,
+            ModelUsage.USE : self.construct_use_graph
+        }
+        constructor = constructors.get(self.model_usage)
+        constructor()
+        
+    def construct_training_graphs(self):
+        self.construct_test_graphs()
+        self.training_graph(
+                        loss=self.loss * self.flags.num_unroll_steps, 
+                        learning_rate=self.flags.learning_rate, 
+                        max_grad_norm=self.flags.max_grad_norm)
+
+    def construct_test_graphs(self):
+        self.construct_use_graph()
+        self.loss_graph(
                         logits=self.logits, 
-                        batch_size=flags.batch_size, 
-                        num_unroll_steps=flags.num_unroll_steps)
+                        batch_size=self.flags.batch_size, 
+                        num_unroll_steps=self.flags.num_unroll_steps)
 
-            self.training_graph(
-                        loss=self.loss * flags.num_unroll_steps, 
-                        learning_rate=flags.learning_rate, 
-                        max_grad_norm=flags.max_grad_norm)
-
-    def conv2d(self, input_, output_dim, k_h, k_w, name="conv2d"):
-        with tf.variable_scope(name):
-            w = tf.get_variable('w', [k_h, k_w, input_.get_shape()[-1], output_dim])
-            b = tf.get_variable('b', [output_dim])
-
-        return tf.nn.conv2d(input_, w, strides=[1, 1, 1, 1], padding='VALID') + b
-
+    def construct_use_graph(self):
+        self.inference_graph(
+                    char_vocab_size=self.char_vocab.size,
+                    word_vocab_size=self.word_vocab.size,
+                    char_embed_size=self.flags.char_embed_size,
+                    batch_size=self.flags.batch_size,
+                    num_highway_layers=self.flags.highway_layers,
+                    num_lstm_layers=self.flags.rnn_layers,
+                    rnn_size=self.flags.rnn_size,
+                    max_word_length=self.max_word_length,
+                    kernels=eval(self.flags.kernels),
+                    kernel_features=eval(self.flags.kernel_features),
+                    num_unroll_steps=self.flags.num_unroll_steps,
+                    dropout=self.flags.dropout)
 
     def linear(self, input_, output_size, scope=None):
         '''
@@ -99,6 +118,12 @@ class Model:
 
         return output
 
+    def conv2d(self, input_, output_dim, k_h, k_w, name="conv2d"):
+        with tf.variable_scope(name):
+            w = tf.get_variable('w', [k_h, k_w, input_.get_shape()[-1], output_dim])
+            b = tf.get_variable('b', [output_dim])
+
+        return tf.nn.conv2d(input_, w, strides=[1, 1, 1, 1], padding='VALID') + b
 
     def conv2dLayers(self, input_, kernels, kernel_features, scope='TDNN'):
         '''
@@ -134,7 +159,6 @@ class Model:
                 output = layers[0]
 
         return output
-
 
     def inference_graph(self,
                         char_vocab_size, 
@@ -174,8 +198,9 @@ class Model:
             input_embedded = tf.reshape(input_embedded, [-1, max_word_length, char_embed_size])
 
         ''' Second, apply convolutions '''
-        # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
+       
         #output_cnn = input_embedded
+        # [batch_size x num_unroll_steps, cnn_size]  where cnn_size=sum(kernel_features)
         output_cnn = self.conv2dLayers(input_embedded, kernels, kernel_features)
 
         #output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)

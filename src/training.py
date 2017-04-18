@@ -6,13 +6,13 @@ import model
 import time
 import csv
 from data_reader import load_data, DataReader
-from model import Model
+from model import Model, ModelUsage
 
 flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/0.5_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/no_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -82,9 +82,9 @@ def main(_):
         initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
 
         with tf.variable_scope("Model", initializer=initializer):
-            train_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, char_embedding_metadata)
+            train_model = Model(flags=FLAGS, char_vocab=char_vocab, word_vocab=word_vocab, max_word_length=max_word_length, metadata=char_embedding_metadata)
         with tf.variable_scope("Model", reuse=True):
-            valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, char_embedding_metadata)
+            valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, ModelUsage.VALIDATE, char_embedding_metadata)
 
         ''' build training graph '''
         '''
@@ -143,7 +143,7 @@ def main(_):
         else:
             tf.global_variables_initializer().run()
             session.run(train_model.clear_char_embedding_padding)
-            print('Created and initialized fresh model. Size:', model.model_size)
+            print('Created and initialized fresh model. Size:', model.model_size())
 
         summary_writer = tf.summary.FileWriter(directory, graph=session.graph)
 

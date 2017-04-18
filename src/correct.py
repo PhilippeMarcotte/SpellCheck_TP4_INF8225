@@ -7,15 +7,12 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from model import Model
+from model import Model, ModelUsage
 from data_reader import load_data, DataReader
 import argparse
 
 
 flags = tf.flags
-
-# data
-
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
@@ -71,7 +68,7 @@ def main(_):
 
         ''' build inference graph '''
         with tf.variable_scope("Model"):
-            model = Model(FLAGS, char_vocab, word_vocab, max_word_length, training=False)
+            model = Model(FLAGS, char_vocab, word_vocab, max_word_length, ModelUsage.USE)
 
             # we need global step only because we want to read it from the model
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
@@ -85,7 +82,6 @@ def main(_):
         logits = np.ones((word_vocab.size,))
 
         while True:
-
             word = input('Enter a word : ')
             if (len(word) > max_word_length):
                 print('Invalid word, maximum word size is ' + max_word_length)
