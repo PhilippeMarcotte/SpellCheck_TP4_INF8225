@@ -33,30 +33,29 @@ class Model:
             self.projector_config = 0
         self.metadata = metadata
 
-        constructors = {
-            ModelUsage.TRAIN : self.construct_training_graphs,
-            ModelUsage.VALIDATE : self.construct_test_graphs,
-            ModelUsage.TEST : self.construct_test_graphs,
-            ModelUsage.USE : self.construct_use_graph
+        builders = {
+            ModelUsage.TRAIN : self.build_train_graph,
+            ModelUsage.VALIDATE : self.build_loss_graph,
+            ModelUsage.TEST : self.build_loss_graph,
+            ModelUsage.USE : self.build_inference_graph
         }
-        constructor = constructors.get(self.model_usage)
-        constructor()
+        builders.get(self.model_usage)()
         
-    def construct_training_graphs(self):
-        self.construct_test_graphs()
+    def build_train_graph(self):
+        self.build_loss_graph()
         self.training_graph(
                         loss=self.loss * self.flags.num_unroll_steps, 
                         learning_rate=self.flags.learning_rate, 
                         max_grad_norm=self.flags.max_grad_norm)
 
-    def construct_test_graphs(self):
-        self.construct_use_graph()
+    def build_loss_graph(self):
+        self.build_inference_graph()
         self.loss_graph(
                         logits=self.logits, 
                         batch_size=self.flags.batch_size, 
                         num_unroll_steps=self.flags.num_unroll_steps)
 
-    def construct_use_graph(self):
+    def build_inference_graph(self):
         self.inference_graph(
                     char_vocab_size=self.char_vocab.size,
                     word_vocab_size=self.word_vocab.size,
@@ -199,11 +198,10 @@ class Model:
 
         ''' Second, apply convolutions '''
        
-        #output_cnn = input_embedded
         # [batch_size x num_unroll_steps, cnn_size]  where cnn_size=sum(kernel_features)
         output_cnn = self.conv2dLayers(input_embedded, kernels, kernel_features)
 
-        #output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
+        output_cnn = self.highway(output_cnn, output_cnn.get_shape()[-1], num_layers=num_highway_layers)
 
         ''' Finally, do LSTM '''
         with tf.variable_scope('LSTM'):

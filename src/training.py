@@ -12,7 +12,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/0.25_corruption_no_highway{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/no_corruption_2_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -47,7 +47,7 @@ def main(_):
     date = time.strftime("%Y-%m-%d %H-%M-%S", time.localtime())
     directory = FLAGS.train_dir.format(date)
     if not os.path.exists(directory):
-        os.mkdir(directory)
+        os.makedirs(directory)
         print('Created training directory', directory)
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
@@ -92,56 +92,8 @@ def main(_):
         with tf.variable_scope("Model", reuse=True):
             valid_model = Model(FLAGS, char_vocab, word_vocab, max_word_length, ModelUsage.VALIDATE, char_embedding_metadata)
 
-        ''' build training graph '''
-        '''
-        initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
-        with tf.variable_scope("Model", initializer=initializer):
-            train_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=FLAGS.batch_size,
-                    num_highway_layers=FLAGS.highway_layers,
-                    num_lstm_layers=FLAGS.rnn_layers,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=FLAGS.dropout,
-                    config=config,
-                    char_embedding_metadata=char_embedding_metadata)
-            train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
-
-            # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
-            # we need it to reproduce how the original Torch code optimizes. Without this, our gradients will be
-            # much smaller (i.e. 35 times smaller) and to get system to learn we'd have to scale learning rate and max_grad_norm appropriately.
-            # Thus, scaling gradients so that this trainer is exactly compatible with the original
-            train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
-                    FLAGS.learning_rate, FLAGS.max_grad_norm))
-            '''
-
         # create saver before creating more graph nodes, so that we do not save any vars defined below
         saver = tf.train.Saver(max_to_keep=50)
-
-        ''' build graph for validation and testing (shares parameters with the training graph!) '''
-        '''
-        with tf.variable_scope("Model", reuse=True):
-            valid_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=FLAGS.batch_size,
-                    num_highway_layers=FLAGS.highway_layers,
-                    num_lstm_layers=FLAGS.rnn_layers,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=0.0)
-            valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
-        '''
 
         if FLAGS.load_model:
             saver.restore(session, FLAGS.load_model)
