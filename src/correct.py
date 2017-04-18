@@ -49,17 +49,15 @@ def main(_):
     
     ''' Loads trained model and evaluates it on test split '''
 
-    if FLAGS.load_model is None or args.model is None:
+    if args.model is None:
         print('Please specify checkpoint file to load model from')
         return -1
     
     if not os.path.exists(args.model + '.meta'):
-        if not os.path.exists(FLAGS.load_model + '.meta'):
-            print('Checkpoint file not found', args.model)
-            return -1
-        model_path = FLAGS.load_model
-    else:
-        model_path = args.model
+        print('Checkpoint file not found', args.model)
+        return -1
+
+    model_path = args.model
     
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length)
