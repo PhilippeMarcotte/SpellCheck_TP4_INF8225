@@ -15,7 +15,7 @@ import argparse
 flags = tf.flags
 
 # data
-flags.DEFINE_string('load_model', "./training/0.5_corruuption_2017-04-17 16-31-48/epoch024_4.4010.model", '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+
 # we need data only to compute vocabulary
 flags.DEFINE_string('data_dir',   'data',    'data directory')
 flags.DEFINE_integer('num_samples', 300, 'how many words to generate')
@@ -33,6 +33,7 @@ flags.DEFINE_integer('num_unroll_steps',1,                             'number o
 flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
 flags.DEFINE_float  ('max_grad_norm',   5.0,                            'normalize gradients at')
 flags.DEFINE_integer('max_word_length', 65,                             'maximum word length')
+
 
 # bookkeeping
 flags.DEFINE_integer('seed',           3435, 'random number generator seed')
