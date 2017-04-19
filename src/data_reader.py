@@ -184,7 +184,7 @@ class DataReader:
     def iter(self):
 
         ydata = self.word_tensor.copy()
-        corrupted_char_tensor = self.corrupt(self.char_tensor, -1.0)
+        corrupted_char_tensor = self.corrupt(self.char_tensor)
 
         x_batches = corrupted_char_tensor.reshape([self.batch_size, -1, self.num_unroll_steps, self.max_word_length])
         y_batches = ydata.reshape([self.batch_size, -1, self.num_unroll_steps])

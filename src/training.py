@@ -12,7 +12,7 @@ flags = tf.flags
 
 # data
 flags.DEFINE_string('data_dir',    './data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   './training/no_corruption_2_highway{}/',     'training directory (models and summaries are saved there periodically)')
+flags.DEFINE_string('train_dir',   './training/0.25_corruption_2_highway{}/',     'training directory (models and summaries are saved there periodically)')
 flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
 
 # model params
@@ -185,7 +185,7 @@ def main(_):
                 tf.Summary.Value(tag="valid_perplexity", simple_value=np.exp(avg_valid_loss))])
             summary_writer.add_summary(summary, step)
 
-            projector.visualize_embeddings(summary_writer, config)
+            projector.visualize_embeddings(summary_writer, valid_model.projector_config)
 
             ''' decide if need to decay learning rate '''
             if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - FLAGS.decay_when:
